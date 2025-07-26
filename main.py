@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
 
+# 안쓰는 파일
 app = FastAPI()
 
 from fastapi.middleware.cors import CORSMiddleware
