@@ -1,105 +1,100 @@
 import React, { useState } from 'react';
 
-export default function SwimRankPredictor() {
-  const [event, setEvent] = useState('');
-  const [age, setAge] = useState('');
-  const [predictedRank, setPredictedRank] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+function SwimRankPredictor() {
+  const [gender, setGender] = useState('M');
+  const [age, setAge] = useState('20-24');
+  const [event, setEvent] = useState('freestyle');
+  const [timeSec, setTimeSec] = useState('');
+  const [rank, setRank] = useState(null);
+  const [error, setError] = useState(null);
 
-  // 사용자 입력 (기록) 받는 상태
-  const [userTime, setUserTime] = useState(''); // 예: "0:32'75" 혹은 초단위 입력도 가능
-
-  // API 호출 + 순위 계산
   const handlePredict = async () => {
-    setError('');
-    setPredictedRank(null);
-
-    if (!event || !age || !userTime) {
-      setError('모든 값을 입력해주세요.');
+    if (!timeSec) {
+      setError('기록(초)을 입력해주세요.');
       return;
     }
 
-    setLoading(true);
+    const params = new URLSearchParams({
+      gender,
+      age,
+      event,
+      time_sec: timeSec,  // 문자열이라도 FastAPI에서 float로 변환 가능
+    });
+
     try {
-      // FastAPI에서 전체 데이터 가져오기 (필터 없이)
-      const res = await fetch('http://127.0.0.1:8000/swim_rank');
-      const data = await res.json();
-
-      // 조건에 맞는 데이터 필터링
-      const filtered = data.filter(
-        (item) => item.event === event && item.age === age
-      );
-
-      // 사용자의 time을 초 단위 숫자로 변환 (간단하게 'time_sec' 입력 받는 게 편할 수도)
-      // 여기서는 초단위 입력 받는 걸로 가정
-      const userTimeSec = parseFloat(userTime);
-
-      if (isNaN(userTimeSec)) {
-        setError('기록을 초 단위 숫자로 입력해주세요.');
-        setLoading(false);
-        return;
-      }
-
-      // 순위 계산: 사용자의 기록보다 빠른 기록이 몇 개 있는지 세기 + 1
-      const rank = filtered.filter((item) => item.time_sec < userTimeSec).length + 1;
-
-      setPredictedRank(rank);
-    } catch (e) {
-      setError('데이터를 가져오는 데 실패했습니다.');
+      const response = await fetch(`http://127.0.0.1:8000/predict_rank?${params}`);
+      if (!response.ok) throw new Error('API 요청 실패');
+      const data = await response.json();
+      console.log('API 응답 데이터:', data); // 디버깅용
+      setRank(data.predicted_rank);           // 여기 수정됨
+      setError(null);
+    } catch (err) {
+      setError('순위 예측에 실패했습니다.');
+      setRank(null);
     }
-    setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: 'auto' }}>
-      <h2>수영 순위 예측기</h2>
+    <div style={{ maxWidth: 400, margin: 'auto', padding: 20 }}>
+      <h2>🏊‍♂️ 수영 순위 예측기</h2>
 
       <div>
-        <label>
-          이벤트 (event):{' '}
-          <input
-            type="text"
-            value={event}
-            onChange={(e) => setEvent(e.target.value)}
-            placeholder="예: freestyle"
-          />
-        </label>
+        <label>성별: </label>
+        <select value={gender} onChange={e => setGender(e.target.value)}>
+          <option value="M">남자 (M)</option>
+          <option value="F">여자 (F)</option>
+        </select>
       </div>
 
       <div>
-        <label>
-          연령대 (age):{' '}
-          <input
-            type="text"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            placeholder="예: 20-24"
-          />
-        </label>
+        <label>연령대: </label>
+        <select value={age} onChange={e => setAge(e.target.value)}>
+          <option value="20-24">20-24</option>
+          <option value="25-29">25-29</option>
+          <option value="30-34">30-34</option>
+          {/* 필요한 연령대 추가 가능 */}
+        </select>
       </div>
 
       <div>
-        <label>
-          기록 (초 단위):{' '}
-          <input
-            type="text"
-            value={userTime}
-            onChange={(e) => setUserTime(e.target.value)}
-            placeholder="예: 32.75"
-          />
-        </label>
+        <label>종목: </label>
+        <select value={event} onChange={e => setEvent(e.target.value)}>
+          <option value="freestyle">freestyle</option>
+          <option value="Back">Back</option>
+          <option value="Breast">Breast</option>
+          <option value="Fly">Fly</option>
+        </select>
       </div>
 
-      <button onClick={handlePredict} disabled={loading}>
-        {loading ? '예측 중...' : '순위 예측하기'}
+      <div>
+        <label>기록 (초): </label>
+        <input
+          type="number"
+          value={timeSec}
+          onChange={e => setTimeSec(e.target.value)}
+          placeholder="예: 32.45"
+          step="0.01"
+          min="0"
+        />
+      </div>
+
+      <button onClick={handlePredict} style={{ marginTop: 10 }}>
+        순위 예측
       </button>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {rank !== null && (
+        <div style={{ marginTop: 20 }}>
+          🏅 예상 순위: <strong>{rank} 위</strong>
+        </div>
+      )}
 
-      {predictedRank !== null && (
-        <p>예상 순위는 <strong>{predictedRank} 위</strong> 입니다.</p>
+      {error && (
+        <div style={{ marginTop: 20, color: 'red' }}>
+          ⚠️ {error}
+        </div>
       )}
     </div>
   );
 }
+
+export default SwimRankPredictor;
